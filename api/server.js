@@ -8,7 +8,14 @@ app.use(express.json());
 
 // Config
 const CONTRACT_ADDRESS = "0xD172eE7F44B1d9e2C2445E89E736B980DA1f1205";
-const RPC_URL = "https://base.publicnode.com";
+// Use multiple RPCs for reliability
+const RPC_URLS = [
+    "https://mainnet.base.org",
+    "https://base.llamarpc.com", 
+    "https://1rpc.io/base",
+    "https://base.publicnode.com"
+];
+const RPC_URL = RPC_URLS[0]; // Primary RPC
 
 const ABI = [
     "function register(string name, string[] platforms, string[] urls) payable",
