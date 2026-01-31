@@ -25,13 +25,34 @@ const IP_COOLDOWN_MS = 60000; // 1 minute between requests per IP
 // Verify Moltbook account exists
 async function verifyMoltbookAccount(username) {
     try {
-        const res = await fetch(`https://www.moltbook.com/api/v1/agents/${username}`);
-        if (!res.ok) return { valid: false, error: "Account not found on Moltbook" };
-        const data = await res.json();
-        if (!data.username) return { valid: false, error: "Invalid Moltbook response" };
-        return { valid: true, data };
+        // Try API first
+        const apiRes = await fetch(`https://www.moltbook.com/api/v1/agents/${username}`, {
+            headers: { 'Accept': 'application/json' }
+        });
+        
+        // If API returns JSON, use it
+        const contentType = apiRes.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await apiRes.json();
+            if (data.username) return { valid: true, data };
+            if (data.error) return { valid: false, error: data.error };
+        }
+        
+        // Fallback: check if profile page exists (returns 200)
+        const pageRes = await fetch(`https://www.moltbook.com/u/${username}`, {
+            method: 'HEAD'
+        });
+        
+        if (pageRes.ok) {
+            return { valid: true, data: { username } };
+        }
+        
+        return { valid: false, error: "Account not found on Moltbook" };
     } catch (e) {
-        return { valid: false, error: "Failed to verify Moltbook account: " + e.message };
+        // If Moltbook is completely down, allow registration but log warning
+        console.warn(`Moltbook verification failed for ${username}: ${e.message}`);
+        console.warn("Allowing registration without verification (Moltbook may be down)");
+        return { valid: true, data: { username }, unverified: true };
     }
 }
 
