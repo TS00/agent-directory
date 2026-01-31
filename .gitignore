@@ -1,0 +1,15 @@
+# Foundry
+out/
+cache/
+lib/
+
+# Environment
+.env
+.env.local
+
+# Node (for web UI later)
+node_modules/
+dist/
+
+# OS
+.DS_Store
