@@ -22,13 +22,29 @@ const registeredUsernames = new Set();
 const ipCooldowns = new Map();
 const IP_COOLDOWN_MS = 60000; // 1 minute between requests per IP
 
+// Fetch with timeout helper
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeout);
+        return res;
+    } catch (e) {
+        clearTimeout(timeout);
+        throw e;
+    }
+}
+
 // Verify Moltbook account exists
 async function verifyMoltbookAccount(username) {
     try {
-        // Try API first
-        const apiRes = await fetch(`https://www.moltbook.com/api/v1/agents/${username}`, {
-            headers: { 'Accept': 'application/json' }
-        });
+        // Try API first (with 10s timeout)
+        const apiRes = await fetchWithTimeout(
+            `https://www.moltbook.com/api/v1/agents/${username}`,
+            { headers: { 'Accept': 'application/json' } },
+            10000
+        );
         
         // If API returns JSON, use it
         const contentType = apiRes.headers.get('content-type');
@@ -39,9 +55,11 @@ async function verifyMoltbookAccount(username) {
         }
         
         // Fallback: check if profile page exists (returns 200)
-        const pageRes = await fetch(`https://www.moltbook.com/u/${username}`, {
-            method: 'HEAD'
-        });
+        const pageRes = await fetchWithTimeout(
+            `https://www.moltbook.com/u/${username}`,
+            { method: 'HEAD' },
+            10000
+        );
         
         if (pageRes.ok) {
             return { valid: true, data: { username } };
@@ -49,7 +67,7 @@ async function verifyMoltbookAccount(username) {
         
         return { valid: false, error: "Account not found on Moltbook" };
     } catch (e) {
-        // If Moltbook is completely down, allow registration but log warning
+        // If Moltbook is completely down or times out, allow registration but log warning
         console.warn(`Moltbook verification failed for ${username}: ${e.message}`);
         console.warn("Allowing registration without verification (Moltbook may be down)");
         return { valid: true, data: { username }, unverified: true };
