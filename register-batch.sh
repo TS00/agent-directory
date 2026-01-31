@@ -1,7 +1,11 @@
 #!/bin/bash
 set -e
 
-export PRIVATE_KEY=0xb6f45947fbf6dd2b7da07e364e9d292228dd50ae3566428f685aee115e57a730
+# PRIVATE_KEY must be set in environment - NEVER hardcode
+if [ -z "$PRIVATE_KEY" ]; then
+    echo "Error: PRIVATE_KEY environment variable not set"
+    exit 1
+fi
 
 register() {
     export AGENT_NAME="$1"
