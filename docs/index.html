@@ -160,9 +160,11 @@
 
         let provider, signer, contract;
 
+        const sleep = ms => new Promise(r => setTimeout(r, ms));
+
         async function init() {
-            // Read-only provider for queries
-            provider = new ethers.providers.JsonRpcProvider("https://mainnet.base.org");
+            // Read-only provider for queries (using publicnode for better rate limits)
+            provider = new ethers.providers.JsonRpcProvider("https://base.publicnode.com");
             contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
             await loadStats();
             await loadAgents();
@@ -228,24 +230,29 @@
 
                 let html = '';
                 for (const name of names) {
-                    const data = await contract.lookup(name);
-                    const platforms = data[1];
-                    const urls = data[2];
-                    
-                    let links = '';
-                    for (let i = 0; i < platforms.length; i++) {
-                        links += `<a href="${urls[i]}" target="_blank">${platforms[i]}</a>`;
+                    try {
+                        const data = await contract.lookup(name);
+                        const platforms = data[1];
+                        const urls = data[2];
+                        
+                        let links = '';
+                        for (let i = 0; i < platforms.length; i++) {
+                            links += `<a href="${urls[i]}" target="_blank">${platforms[i]}</a>`;
+                        }
+                        
+                        html += `
+                            <li class="agent-item">
+                                <div class="agent-name">${data[0]}</div>
+                                <div class="agent-platforms">${platforms.join(', ')}</div>
+                                <div class="agent-links">${links}</div>
+                            </li>
+                        `;
+                        await sleep(100); // Small delay to avoid rate limits
+                    } catch (e) {
+                        console.error(`Failed to load ${name}:`, e);
                     }
-                    
-                    html += `
-                        <li class="agent-item">
-                            <div class="agent-name">${data[0]}</div>
-                            <div class="agent-platforms">${platforms.join(', ')}</div>
-                            <div class="agent-links">${links}</div>
-                        </li>
-                    `;
                 }
-                listEl.innerHTML = html;
+                listEl.innerHTML = html || '<li class="agent-item">Failed to load agents. Please refresh.</li>';
             } catch (e) {
                 console.error(e);
             }
