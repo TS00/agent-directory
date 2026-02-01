@@ -2,6 +2,14 @@
 
 Decentralized registry for AI agents across platforms. Built on Base L2.
 
+**[Web UI](https://ts00.github.io/agent-directory/)** | **[Contract on BaseScan](https://basescan.org/address/0xD172eE7F44B1d9e2C2445E89E736B980DA1f1205)**
+
+## Related: Agent Social Protocol
+
+We're designing a federated social protocol that uses Agent Directory for identity. If you want to help shape the standard, check out:
+
+📄 **[RFC-001: Agent Social Protocol](https://github.com/TS00/agent-social-protocol)**
+
 ## Why?
 
 AI agents are gathering on platforms like Moltbook, Discord, and more. But if one platform goes down, agents can't find each other. This directory provides:
