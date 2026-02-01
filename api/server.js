@@ -305,6 +305,188 @@ app.get('/agents', async (req, res) => {
     }
 });
 
+// ============ CAPABILITY DISCOVERY ============
+// Off-chain layer for agent capabilities
+
+const fs = require('fs');
+const path = require('path');
+const CAPABILITIES_FILE = path.join(__dirname, 'data', 'capabilities.json');
+
+// Load capabilities from file
+function loadCapabilities() {
+    try {
+        if (fs.existsSync(CAPABILITIES_FILE)) {
+            return JSON.parse(fs.readFileSync(CAPABILITIES_FILE, 'utf8'));
+        }
+    } catch (e) {
+        console.error('Failed to load capabilities:', e.message);
+    }
+    return { _meta: { version: '1.0.0' } };
+}
+
+// Save capabilities to file
+function saveCapabilities(data) {
+    try {
+        data._meta = data._meta || {};
+        data._meta.updatedAt = new Date().toISOString();
+        fs.writeFileSync(CAPABILITIES_FILE, JSON.stringify(data, null, 2));
+        return true;
+    } catch (e) {
+        console.error('Failed to save capabilities:', e.message);
+        return false;
+    }
+}
+
+// POST /agents/:name/capabilities - set agent capabilities
+app.post('/agents/:name/capabilities', async (req, res) => {
+    const { name } = req.params;
+    const { capabilities, description } = req.body;
+    
+    if (!capabilities || !Array.isArray(capabilities)) {
+        return res.status(400).json({
+            success: false,
+            error: "capabilities must be an array of strings"
+        });
+    }
+    
+    // Validate capabilities (lowercase, alphanumeric + hyphens)
+    const validCaps = capabilities
+        .map(c => String(c).toLowerCase().trim())
+        .filter(c => /^[a-z0-9-]+$/.test(c) && c.length <= 32);
+    
+    if (validCaps.length === 0) {
+        return res.status(400).json({
+            success: false,
+            error: "No valid capabilities provided. Use lowercase alphanumeric with hyphens."
+        });
+    }
+    
+    // Verify agent exists on-chain
+    try {
+        const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);
+        const data = await contract.lookup(name);
+        
+        if (!data[0] || data[0].length === 0) {
+            return res.status(404).json({
+                success: false,
+                error: "Agent not found in directory. Register first."
+            });
+        }
+    } catch (e) {
+        return res.status(404).json({
+            success: false,
+            error: "Agent not found in directory"
+        });
+    }
+    
+    // Update capabilities
+    const caps = loadCapabilities();
+    caps[name] = {
+        capabilities: validCaps,
+        description: description ? String(description).slice(0, 200) : null,
+        updatedAt: new Date().toISOString()
+    };
+    
+    if (!saveCapabilities(caps)) {
+        return res.status(500).json({
+            success: false,
+            error: "Failed to save capabilities"
+        });
+    }
+    
+    console.log(`Capabilities updated for ${name}: ${validCaps.join(', ')}`);
+    
+    res.json({
+        success: true,
+        agent: name,
+        capabilities: validCaps,
+        description: caps[name].description
+    });
+});
+
+// GET /agents/:name/capabilities - get agent capabilities
+app.get('/agents/:name/capabilities', (req, res) => {
+    const { name } = req.params;
+    const caps = loadCapabilities();
+    
+    if (!caps[name]) {
+        return res.status(404).json({
+            success: false,
+            error: "No capabilities registered for this agent"
+        });
+    }
+    
+    res.json({
+        success: true,
+        agent: name,
+        ...caps[name]
+    });
+});
+
+// GET /find - find agents by capability
+app.get('/find', (req, res) => {
+    const { capability, cap, q } = req.query;
+    const searchCap = (capability || cap || q || '').toLowerCase().trim();
+    
+    if (!searchCap) {
+        return res.status(400).json({
+            success: false,
+            error: "Provide ?capability=X to search"
+        });
+    }
+    
+    const caps = loadCapabilities();
+    const matches = [];
+    
+    for (const [agent, data] of Object.entries(caps)) {
+        if (agent === '_meta') continue;
+        if (data.capabilities && data.capabilities.some(c => c.includes(searchCap))) {
+            matches.push({
+                name: agent,
+                capabilities: data.capabilities,
+                description: data.description,
+                matchedOn: data.capabilities.filter(c => c.includes(searchCap))
+            });
+        }
+    }
+    
+    res.json({
+        success: true,
+        query: searchCap,
+        count: matches.length,
+        agents: matches
+    });
+});
+
+// GET /capabilities - list all known capabilities
+app.get('/capabilities', (req, res) => {
+    const caps = loadCapabilities();
+    const allCaps = new Map();
+    
+    for (const [agent, data] of Object.entries(caps)) {
+        if (agent === '_meta') continue;
+        if (data.capabilities) {
+            for (const cap of data.capabilities) {
+                if (!allCaps.has(cap)) {
+                    allCaps.set(cap, []);
+                }
+                allCaps.get(cap).push(agent);
+            }
+        }
+    }
+    
+    const result = Array.from(allCaps.entries())
+        .map(([capability, agents]) => ({ capability, count: agents.length, agents }))
+        .sort((a, b) => b.count - a.count);
+    
+    res.json({
+        success: true,
+        totalCapabilities: result.length,
+        capabilities: result
+    });
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
