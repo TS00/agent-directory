@@ -255,6 +255,56 @@ app.get('/lookup/:name', async (req, res) => {
     }
 });
 
+// GET /agents - list all registered agents
+app.get('/agents', async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+        const offset = parseInt(req.query.offset) || 0;
+        
+        const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+        const extendedABI = [
+            ...ABI,
+            "function getAgentNames(uint256 offset, uint256 limit) view returns (string[])",
+            "function getAgentNameByIndex(uint256 index) view returns (string)"
+        ];
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, extendedABI, provider);
+        
+        // Get total count
+        const total = await contract.count();
+        
+        // Get agent names for this page
+        const names = await contract.getAgentNames(offset, limit);
+        
+        // Fetch full details for each agent
+        const agents = await Promise.all(names.map(async (name) => {
+            try {
+                const data = await contract.lookup(name);
+                return {
+                    name: data[0],
+                    platforms: data[1],
+                    urls: data[2],
+                    registrant: data[3],
+                    registeredAt: new Date(data[4].toNumber() * 1000).toISOString(),
+                    lastActive: new Date(data[5].toNumber() * 1000).toISOString()
+                };
+            } catch {
+                return { name, error: "Failed to fetch details" };
+            }
+        }));
+        
+        res.json({
+            success: true,
+            total: total.toNumber(),
+            offset,
+            limit,
+            count: agents.length,
+            agents
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
