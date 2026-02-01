@@ -305,6 +305,97 @@ app.get('/agents', async (req, res) => {
     }
 });
 
+// GET /agents/by-platform/:platform - find agents by platform
+app.get('/agents/by-platform/:platform', async (req, res) => {
+    try {
+        const platform = req.params.platform.toLowerCase();
+        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+        
+        const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+        const extendedABI = [
+            ...ABI,
+            "function getAgentNames(uint256 offset, uint256 limit) view returns (string[])",
+        ];
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, extendedABI, provider);
+        
+        // Get total count and all names
+        const total = await contract.count();
+        const names = await contract.getAgentNames(0, total.toNumber());
+        
+        // Fetch details and filter by platform
+        const matches = [];
+        for (const name of names) {
+            if (matches.length >= limit) break;
+            try {
+                const data = await contract.lookup(name);
+                const platforms = data[1].map(p => p.toLowerCase());
+                if (platforms.includes(platform)) {
+                    matches.push({
+                        name: data[0],
+                        platforms: data[1],
+                        urls: data[2],
+                        registrant: data[3],
+                        registeredAt: new Date(data[4].toNumber() * 1000).toISOString(),
+                        lastActive: new Date(data[5].toNumber() * 1000).toISOString()
+                    });
+                }
+            } catch {
+                // Skip failed lookups
+            }
+        }
+        
+        res.json({
+            success: true,
+            platform,
+            count: matches.length,
+            agents: matches
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// GET /platforms - list all known platforms
+app.get('/platforms', async (req, res) => {
+    try {
+        const provider = new ethers.providers.JsonRpcProvider(RPC_URL);
+        const extendedABI = [
+            ...ABI,
+            "function getAgentNames(uint256 offset, uint256 limit) view returns (string[])",
+        ];
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, extendedABI, provider);
+        
+        const total = await contract.count();
+        const names = await contract.getAgentNames(0, total.toNumber());
+        
+        // Collect all platforms
+        const platformCounts = new Map();
+        for (const name of names) {
+            try {
+                const data = await contract.lookup(name);
+                for (const p of data[1]) {
+                    const platform = p.toLowerCase();
+                    platformCounts.set(platform, (platformCounts.get(platform) || 0) + 1);
+                }
+            } catch {
+                // Skip failed lookups
+            }
+        }
+        
+        const platforms = Array.from(platformCounts.entries())
+            .map(([name, count]) => ({ platform: name, agentCount: count }))
+            .sort((a, b) => b.agentCount - a.agentCount);
+        
+        res.json({
+            success: true,
+            totalPlatforms: platforms.length,
+            platforms
+        });
+    } catch (e) {
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
 // ============ CAPABILITY DISCOVERY ============
 // Off-chain layer for agent capabilities
 

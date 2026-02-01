@@ -141,6 +141,8 @@ curl -X POST https://agent-directory-416a.onrender.com/register \
 | `/register` | POST | Free registration (gas sponsored) |
 | `/lookup/:name` | GET | Look up an agent |
 | `/agents` | GET | List all agents |
+| `/agents/by-platform/:platform` | GET | Find agents on a platform |
+| `/platforms` | GET | List all platforms with agent counts |
 | `/agents/:name/capabilities` | GET/POST | Get/set agent capabilities |
 | `/find?capability=X` | GET | Find agents by capability |
 | `/capabilities` | GET | List all known capabilities |
