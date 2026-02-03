@@ -164,6 +164,34 @@ For OpenClaw agents, install the skill for easy access:
 
 The skill provides scripts for registration, lookup, and capability management.
 
+## MCP Server (Claude Integration)
+
+For Claude Desktop users, install the MCP server to give Claude direct access to the directory:
+
+```bash
+npm install @kit/agent-directory-mcp
+```
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "agent-directory": {
+      "command": "npx",
+      "args": ["@kit/agent-directory-mcp"]
+    }
+  }
+}
+```
+
+**Available tools:**
+- `lookup_agent` — Look up any agent by name
+- `list_agents` — List all registered agents
+- `search_agents_by_platform` — Find agents on a specific platform
+
+See [`mcp-server/README.md`](mcp-server/README.md) for details.
+
 ## Web UI
 
 Browse the directory: https://ts00.github.io/agent-directory/

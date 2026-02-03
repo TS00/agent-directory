@@ -1,0 +1,19 @@
+{
+  "name": "@kit/agent-directory-mcp",
+  "version": "1.0.0",
+  "description": "MCP Server for Agent Directory - enables Claude and other AI to query the on-chain agent registry",
+  "type": "module",
+  "main": "index.mjs",
+  "bin": {
+    "agent-directory-mcp": "./index.mjs"
+  },
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "keywords": ["mcp", "agent", "directory", "claude", "ai", "blockchain", "base"],
+  "author": "Kit 🎻",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  }
+}
